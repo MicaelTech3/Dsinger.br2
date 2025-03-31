@@ -5,6 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dsigner - Painel</title>
     <link rel="stylesheet" href="painel.css">
+    <style>
+        /* Additional styles for new features */
+        .new-key-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .new-key-btn:hover {
+            background: #45a049;
+        }
+
+        #text-options textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        #text-options label {
+            display: inline-block;
+            margin-right: 15px;
+            margin-top: 10px;
+        }
+
+        #activation-key-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .text-message {
+            padding: 20px;
+            background: #2a2f5b;
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            max-width: 80%;
+            margin: 0 auto;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <header class="painel-header">
@@ -171,12 +217,28 @@
             <div class="form-group">
                 <label for="media-type">Tipo de Mídia:</label>
                 <select id="media-type">
+                    <option value="text">Texto</option>
                     <option value="image">Imagem</option>
                     <option value="video">Vídeo</option>
                     <option value="link">Link Externo</option>
                 </select>
             </div>
-            <div class="form-group" id="file-upload-group">
+            
+            <div id="text-options" class="form-group" style="display:none;">
+                <textarea id="text-content" placeholder="Digite sua mensagem..."></textarea>
+                <label>Cor do Texto: <input type="color" id="text-color" value="#ffffff"></label>
+                <label>Cor de Fundo: <input type="color" id="text-bg-color" value="#1a1f3b"></label>
+                <label>Tamanho: 
+                    <select id="text-size">
+                        <option value="16">Pequeno</option>
+                        <option value="24" selected>Médio</option>
+                        <option value="32">Grande</option>
+                        <option value="48">Extra Grande</option>
+                    </select>
+                </label>
+            </div>
+            
+            <div class="form-group" id="file-upload-group" style="display:none;">
                 <label for="media-file">Arquivo (máx. 10MB):</label>
                 <input type="file" id="media-file" accept="image/*, video/*">
                 <div class="upload-progress">
@@ -184,19 +246,23 @@
                 </div>
                 <img id="media-preview" class="media-preview" alt="Pré-visualização">
             </div>
-            <div class="form-group" id="link-upload-group" style="display: none;">
+            
+            <div class="form-group" id="link-upload-group" style="display:none;">
                 <label for="media-link">URL:</label>
                 <input type="text" id="media-link" placeholder="https://exemplo.com/imagem.jpg">
             </div>
-            <div id="image-options" class="form-group">
+            
+            <div id="image-options" class="form-group" style="display:none;">
                 <label for="image-duration">Duração (segundos):</label>
                 <input type="number" id="image-duration" value="10" min="1">
             </div>
-            <div id="video-options" class="form-group" style="display: none;">
+            
+            <div id="video-options" class="form-group" style="display:none;">
                 <label>
                     <input type="checkbox" id="video-loop"> Repetir vídeo
                 </label>
             </div>
+            
             <button id="upload-media-btn" class="btn">Enviar</button>
             <div id="upload-status" class="message"></div>
         </div>
@@ -208,7 +274,9 @@
             <h2>Informações de Ativação</h2>
             <div class="form-group">
                 <label>Chave de Ativação:</label>
-                <div class="device-info-value" id="activation-key-info"></div>
+                <div id="activation-key-container">
+                    <span id="activation-key-info"></span>
+                </div>
             </div>
             <div class="form-group">
                 <label>Nome do Dispositivo:</label>
@@ -221,13 +289,57 @@
         </div>
     </div>
 
+    <div class="modal" id="text-message-modal">
+        <div class="modal-content">
+            <span class="close-btn">×</span>
+            <h2>Enviar Mensagem de Texto</h2>
+            <div class="form-group">
+                <label for="text-message-content">Mensagem:</label>
+                <textarea id="text-message-content" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Cor do Texto: <input type="color" id="text-color" value="#ffffff"></label>
+            </div>
+            <div class="form-group">
+                <label>Cor de Fundo: <input type="color" id="bg-color" value="#1a1f3b"></label>
+            </div>
+            <div class="form-group">
+                <label>Tamanho da Fonte:
+                    <select id="text-size">
+                        <option value="16">Pequeno</option>
+                        <option value="24" selected>Médio</option>
+                        <option value="32">Grande</option>
+                        <option value="48">Extra Grande</option>
+                    </select>
+                </label>
+            </div>
+            <button id="send-text-btn" class="btn">Enviar Mensagem</button>
+        </div><div id="activation-info-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h3>Informações de Ativação</h3>
+                <div class="info-group">
+                    <label>Chave de Ativação:</label>
+                    <div id="activation-key-container">
+                        <span id="activation-key-info"></span>
+                    </div>
+                </div>
+                <div class="info-group">
+                    <label>Dispositivo:</label>
+                    <span id="activation-device-info"></span>
+                </div>
+                <div class="info-group">
+                    <label>Última Ativação:</label>
+                    <span id="activation-last-info"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-    
-    <!-- App Script -->
-    <script src="painel.js"></script>
-</body>
-</html>
+</div><!-- App Script -->
+<script src="painel.js"></script>
