@@ -1,22 +1,32 @@
 // Configuração do Firebase
 const firebaseConfig = {
-        apiKey: "AIzaSyAo12uC5EM7t4_nocYhfOdTY15men1Ping",
-        authDomain: "dsigner-com-br.firebaseapp.com",
-        databaseURL: "https://dsigner-com-br-default-rtdb.firebaseio.com",
-        projectId: "dsigner-com-br",
-        storageBucket: "dsigner-com-br.firebasestorage.app",
-        messagingSenderId: "905799758619",
-        appId: "1:905799758619:web:713beeced2de2cdd7f19be"
-      };
-// Inicialização única do Firebase
+    apiKey: "AIzaSyAo12uC5EM7t4_nocYhfOdTY15men1Ping",
+    authDomain: "dsigner-com-br.firebaseapp.com",
+    databaseURL: "https://dsigner-com-br-default-rtdb.firebaseio.com",
+    projectId: "dsigner-com-br",
+    storageBucket: "dsigner-com-br.firebasestorage.app",
+    messagingSenderId: "905799758619",
+    appId: "1:905799758619:web:713beeced2de2cdd7f19be"
+};
+
+// Inicialização com tratamento de offline
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
+    
     const firestoreSettings = {
         cache: {
-          sizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-        }
+            sizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
+        },
+        experimentalForceLongPolling: true
     };
+    
     firebase.firestore().settings(firestoreSettings);
+    
+    // Ativa persistência
+    firebase.firestore().enablePersistence()
+        .catch(err => {
+            console.error("Erro na persistência offline:", err);
+        });
 }
 
 const db = firebase.firestore();
@@ -85,7 +95,128 @@ const syncWithFirebase = async () => {
                 await db.collection('tvs').doc(tv.id).set(tv);
             }
         }
-
+        async function sendTextMessage(tvId, messageData) {
+            const tv = tvs.find(t => t.id === tvId);
+            if (!tv) return;
+        
+            tv.media = {
+                type: 'text',
+                content: messageData.text,
+                color: messageData.color,
+                bgColor: messageData.bgColor,
+                fontSize: messageData.fontSize,
+                timestamp: new Date()
+            };
+        
+            saveLocalData();
+        
+            if (isOnline()) {
+                try {
+                    await db.collection('tvs').doc(tvId).update({
+                        media: tv.media
+                    });
+                    showToast('Mensagem enviada com sucesso!', 'success');
+                    return true;
+                } catch (error) {
+                    console.error("Erro ao enviar mensagem:", error);
+                    showToast('Erro ao enviar. Mensagem salva localmente.', 'error');
+                    return false;
+                }
+            } else {
+                showToast('Mensagem salva localmente (offline)', 'info');
+                return false;
+            }
+        }
+        
+        // Event Listeners para texto
+        document.addEventListener('click', e => {
+            const textBtn = e.target.closest('.send-text-btn');
+            if (textBtn) {
+                const tvId = textBtn.dataset.id;
+                document.getElementById('text-message-modal').style.display = 'block';
+                document.getElementById('send-text-btn').dataset.tvId = tvId;
+                document.getElementById('text-message-content').value = '';
+            }
+        });
+        
+        document.getElementById('send-text-btn').addEventListener('click', async function() {
+            const tvId = this.dataset.tvId;
+            const message = document.getElementById('text-message-content').value.trim();
+            
+            if (!message) {
+                showToast('Digite uma mensagem!', 'error');
+                return;
+            }
+        
+            const messageData = {
+                text: message,
+                color: document.getElementById('text-color').value,
+                bgColor: document.getElementById('bg-color').value,
+                fontSize: document.getElementById('text-size').value
+            };
+        
+            await sendTextMessage(tvId, messageData);
+            document.getElementById('text-message-modal').style.display = 'none';
+        });
+        
+        // Modifique a função de visualização para texto
+        function displayMediaContent(tv) {
+            const container = document.getElementById('media-container');
+            container.innerHTML = '';
+        
+            if (!tv.media) return;
+        
+            if (tv.media.type === 'text') {
+                container.innerHTML = `
+                    <div class="text-display" style="
+                        color: ${tv.media.color || '#ffffff'};
+                        background: ${tv.media.bgColor || '#1a1f3b'};
+                        font-size: ${tv.media.fontSize || 24}px;
+                        padding: 20px;
+                        border-radius: 10px;
+                        width: 80%;
+                        margin: 0 auto;
+                        text-align: center;
+                    ">
+                        ${tv.media.content}
+                    </div>
+                    <div class="text-info" style="
+                        font-size: 12px;
+                        color: #ccc;
+                        text-align: right;
+                        margin-top: 10px;
+                    ">
+                        Enviado em: ${new Date(tv.media.timestamp).toLocaleString()}
+                    </div>
+                `;
+            } else if (tv.media.type === 'image') {
+                // ... (código existente para imagens)
+            } else if (tv.media.type === 'video') {
+                // ... (código existente para vídeos)
+            }
+        }async function sendContentToTV(tvId, content) {
+            const tvRef = db.collection('tvs').doc(tvId);
+            
+            try {
+                await tvRef.update({
+                    media: content,
+                    lastUpdate: new Date()
+                });
+                showToast('Conteúdo enviado com sucesso!', 'success');
+                return true;
+            } catch (error) {
+                console.error("Erro ao enviar conteúdo:", error);
+                
+                // Fallback offline
+                const tv = tvs.find(t => t.id === tvId);
+                if (tv) {
+                    tv.media = content;
+                    saveLocalData();
+                    showToast('Conteúdo salvo localmente (offline)', 'info');
+                }
+                return false;
+            }
+        }
         saveLocalData();
         updateCategoryList();
         updateTvGrid();
@@ -798,4 +929,55 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTvGrid();
         }
     });
+
+    // Adicione esta função ao seu painel.js para lidar com mensagens de texto
+function displayTextMessage(content) {
+    const modal = document.getElementById('view-media-modal');
+    const container = document.getElementById('media-container');
+    
+    container.innerHTML = `
+        <div class="text-message" style="
+            padding: 20px;
+            background: #2a2f5b;
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            max-width: 80%;
+            margin: 0 auto;
+            text-align: center;
+        ">
+            ${content}
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+}
+
+// Modifique a função de visualização de mídia no painel.js
+document.addEventListener('click', e => {
+    const viewBtn = e.target.closest('.view-tv-btn');
+    if (viewBtn) {
+        const tvId = viewBtn.dataset.id;
+        const tv = tvs.find(t => t.id === tvId);
+        
+        if (!tv.media) {
+            showToast('Nenhuma mídia enviada para esta TV', 'info');
+            return;
+        }
+
+        const modal = document.getElementById('view-media-modal');
+        const container = document.getElementById('media-container');
+        container.innerHTML = '';
+
+        if (tv.media.type === 'text') {
+            displayTextMessage(tv.media.content);
+        } else if (tv.media.type === 'image') {
+            // Código existente para imagens...
+        } else if (tv.media.type === 'video') {
+            // Código existente para vídeos...
+        }
+
+        modal.style.display = 'block';
+    }
+});
 });
