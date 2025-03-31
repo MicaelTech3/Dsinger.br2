@@ -16,7 +16,6 @@
             align-items: center;
             height: 100vh;
             overflow: hidden;
-            transition: all 0.3s;
         }
 
         /* Modo Gerador */
@@ -48,8 +47,12 @@
             border-radius: 5px;
             font-weight: bold;
             cursor: pointer;
-            margin: 10px 0;
+            margin: 5px 0;
             width: 100%;
+        }
+
+        .btn-view {
+            background-color: #4CAF50;
         }
 
         /* Modo Player */
@@ -108,17 +111,17 @@
     </style>
 </head>
 <body>
-    <!-- Modo Gerador (aparece quando não tem chave) -->
+    <!-- Modo Gerador -->
     <div id="generator-mode">
-        <h2>Gerador Dskey</h2>
+        <h2>Dskey - Controle de TV</h2>
         <p>Sua chave única de ativação:</p>
         <div id="activation-key" class="key-display">Gerando chave...</div>
         <button id="copy-btn" class="btn">Copiar Chave</button>
-        <button id="new-key-btn" class="btn">Gerar Nova Chave</button>
+        <button id="view-btn" class="btn btn-view">Visualizar Conteúdo</button>
         <div class="connection-status" id="gen-status"></div>
     </div>
 
-    <!-- Modo Player (aparece quando tem chave) -->
+    <!-- Modo Player -->
     <div id="player-mode">
         <div id="media-display">
             <!-- Conteúdo será injetado aqui -->
@@ -144,42 +147,42 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Verificar se está no modo player ou gerador
-        const urlParams = new URLSearchParams(window.location.search);
-        const activationKey = urlParams.get('key');
+        // Elementos
+        const generatorMode = document.getElementById('generator-mode');
+        const playerMode = document.getElementById('player-mode');
+        const activationKeyEl = document.getElementById('activation-key');
+        const viewBtn = document.getElementById('view-btn');
+        let currentKey = generateKey();
 
-        if (activationKey) {
-            // Modo Player
-            initPlayerMode(activationKey);
-        } else {
-            // Modo Gerador
-            initGeneratorMode();
-        }
+        // Inicialização
+        activationKeyEl.textContent = currentKey;
+        updateGenStatus('Pronto para uso', 'online');
 
-        // ========== MODO GERADOR ==========
-        function initGeneratorMode() {
-            document.getElementById('generator-mode').style.display = 'flex';
-            document.getElementById('player-mode').style.display = 'none';
-            
-            let currentKey = generateKey();
-            document.getElementById('activation-key').textContent = currentKey;
-            updateGenStatus('Gerador pronto', 'online');
+        // Botão Copiar
+        document.getElementById('copy-btn').addEventListener('click', () => {
+            navigator.clipboard.writeText(currentKey);
+            alert('Chave copiada! Cole no painel ao criar a TV.');
+        });
 
-            // Botão Copiar
-            document.getElementById('copy-btn').addEventListener('click', () => {
-                navigator.clipboard.writeText(currentKey);
-                alert('Chave copiada! Cole no painel ao criar a TV.');
-            });
+        // Botão Visualizar
+        viewBtn.addEventListener('click', () => {
+            // Alternar entre modos
+            if (playerMode.style.display === 'none') {
+                generatorMode.style.display = 'none';
+                playerMode.style.display = 'block';
+                initPlayerMode(currentKey);
+                viewBtn.textContent = 'Voltar ao Gerador';
+            } else {
+                playerMode.style.display = 'none';
+                generatorMode.style.display = 'flex';
+                viewBtn.textContent = 'Visualizar Conteúdo';
+                if (unsubscribe) unsubscribe();
+            }
+        });
 
-            // Botão Nova Chave
-            document.getElementById('new-key-btn').addEventListener('click', () => {
-                currentKey = generateKey();
-                document.getElementById('activation-key').textContent = currentKey;
-            });
-        }
-
+        // Funções auxiliares
         function generateKey() {
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Remove caracteres ambíguos
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let key = '';
             for (let i = 0; i < 8; i++) {
                 key += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -194,110 +197,104 @@
         }
 
         // ========== MODO PLAYER ==========
-        function initPlayerMode(key) {
-            document.getElementById('generator-mode').style.display = 'none';
-            document.getElementById('player-mode').style.display = 'block';
-            
-            let unsubscribe;
-            let isOnline = navigator.onLine;
+        let unsubscribe;
 
+        function initPlayerMode(key) {
+            updatePlayerStatus('Conectando...', 'offline');
+            
             // Monitorar status da conexão
             window.addEventListener('online', () => {
-                isOnline = true;
                 updatePlayerStatus('✔ Online', 'online');
-                if (!unsubscribe) startListening();
+                if (!unsubscribe) startListening(key);
             });
 
             window.addEventListener('offline', () => {
-                isOnline = false;
-                updatePlayerStatus('⚡ Offline - Tentando reconectar...', 'offline');
+                updatePlayerStatus('⚡ Offline', 'offline');
             });
 
             // Iniciar listener
-            startListening();
+            startListening(key);
+        }
 
-            function startListening() {
-                updatePlayerStatus('Conectando...', 'offline');
-                
-                unsubscribe = db.collection('tvs')
-                    .where('activationKey', '==', key)
-                    .onSnapshot(handleSnapshot, handleError);
+        function startListening(key) {
+            unsubscribe = db.collection('tvs')
+                .where('activationKey', '==', key)
+                .onSnapshot(handleSnapshot, handleError);
+        }
+
+        function handleSnapshot(snapshot) {
+            if (snapshot.empty) {
+                showError('Nenhuma TV encontrada com esta chave');
+                return;
             }
 
-            function handleSnapshot(snapshot) {
-                if (snapshot.empty) {
-                    showError('Nenhuma TV encontrada com esta chave');
-                    return;
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added' || change.type === 'modified') {
+                    updateDisplay(change.doc.data());
                 }
+            });
 
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'added' || change.type === 'modified') {
-                        updateDisplay(change.doc.data());
-                    }
-                });
+            updatePlayerStatus('✔ Sincronizado', 'online');
+        }
 
-                updatePlayerStatus('✔ Sincronizado', 'online');
+        function handleError(error) {
+            console.error("Erro na conexão:", error);
+            updatePlayerStatus('Erro de conexão', 'offline');
+            
+            if (error.code === 'unavailable') {
+                setTimeout(() => startListening(currentKey), 5000);
+            }
+        }
+
+        function updateDisplay(tvData) {
+            const display = document.getElementById('media-display');
+            const info = document.getElementById('media-info');
+            
+            display.innerHTML = '';
+            info.textContent = `TV ${tvData.name || 'Sem nome'} • ${new Date().toLocaleTimeString()}`;
+
+            if (!tvData.media) {
+                display.innerHTML = '<p>Aguardando conteúdo...</p>';
+                return;
             }
 
-            function handleError(error) {
-                console.error("Erro na conexão:", error);
-                updatePlayerStatus('Erro de conexão', 'offline');
-                
-                if (error.code === 'unavailable') {
-                    setTimeout(startListening, 5000);
-                }
+            if (tvData.media.type === 'text') {
+                const textEl = document.createElement('div');
+                textEl.className = 'text-content';
+                textEl.style.color = tvData.media.color || '#ffffff';
+                textEl.style.backgroundColor = tvData.media.bgColor || 'transparent';
+                textEl.style.fontSize = (tvData.media.fontSize || 24) + 'px';
+                textEl.textContent = tvData.media.content;
+                display.appendChild(textEl);
+            } 
+            else if (tvData.media.type === 'image') {
+                const imgEl = document.createElement('img');
+                imgEl.src = tvData.media.url;
+                imgEl.style.maxWidth = '100%';
+                imgEl.style.maxHeight = '90vh';
+                display.appendChild(imgEl);
             }
-
-            function updateDisplay(tvData) {
-                const display = document.getElementById('media-display');
-                const info = document.getElementById('media-info');
-                
-                display.innerHTML = '';
-                info.textContent = `TV ${tvData.name} • ${new Date().toLocaleTimeString()}`;
-
-                if (!tvData.media) {
-                    display.innerHTML = '<p>Aguardando conteúdo...</p>';
-                    return;
-                }
-
-                if (tvData.media.type === 'text') {
-                    const textEl = document.createElement('div');
-                    textEl.className = 'text-content';
-                    textEl.style.color = tvData.media.color || '#ffffff';
-                    textEl.style.backgroundColor = tvData.media.bgColor || 'transparent';
-                    textEl.style.fontSize = (tvData.media.fontSize || 24) + 'px';
-                    textEl.textContent = tvData.media.content;
-                    display.appendChild(textEl);
-                } 
-                else if (tvData.media.type === 'image') {
-                    const imgEl = document.createElement('img');
-                    imgEl.src = tvData.media.url;
-                    imgEl.style.maxWidth = '100%';
-                    imgEl.style.maxHeight = '90vh';
-                    display.appendChild(imgEl);
-                }
-                else if (tvData.media.type === 'video') {
-                    const videoEl = document.createElement('video');
-                    videoEl.src = tvData.media.url;
-                    videoEl.controls = false;
-                    videoEl.autoplay = true;
-                    videoEl.loop = tvData.media.loop || false;
-                    videoEl.style.maxWidth = '100%';
-                    videoEl.style.maxHeight = '90vh';
-                    display.appendChild(videoEl);
-                }
+            else if (tvData.media.type === 'video') {
+                const videoEl = document.createElement('video');
+                videoEl.src = tvData.media.url;
+                videoEl.controls = false;
+                videoEl.autoplay = true;
+                videoEl.loop = tvData.media.loop || false;
+                videoEl.style.maxWidth = '100%';
+                videoEl.style.maxHeight = '90vh';
+                display.appendChild(videoEl);
             }
+        }
 
-            function showError(message) {
-                const display = document.getElementById('media-display');
-                display.innerHTML = `<p style="color: #ff5555">${message}</p>`;
-            }
+        function showError(message) {
+            const display = document.getElementById('media-display');
+            display.innerHTML = `<p style="color: #ff5555">${message}</p>`;
+        }
 
-            function updatePlayerStatus(message, status) {
-                const el = document.getElementById('player-status');
-                el.textContent = message;
-                el.className = 'connection-status ' + status;
-            }
+        function updatePlayerStatus(message, status) {
+            const el = document.getElementById('player-status');
+            el.textContent = message;
+            el.className = 'connection-status ' + status;
         }
     </script>
 </body>

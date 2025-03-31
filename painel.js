@@ -4,7 +4,7 @@ const firebaseConfig = {
     authDomain: "dsigner-com-br.firebaseapp.com",
     databaseURL: "https://dsigner-com-br-default-rtdb.firebaseio.com",
     projectId: "dsigner-com-br",
-    storageBucket: "dsigner-com-br.firebasestorage.app",
+    storageBucket: "dsigner-com-br.appspot.com",
     messagingSenderId: "905799758619",
     appId: "1:905799758619:web:713beeced2de2cdd7f19be"
 };
@@ -95,128 +95,7 @@ const syncWithFirebase = async () => {
                 await db.collection('tvs').doc(tv.id).set(tv);
             }
         }
-        async function sendTextMessage(tvId, messageData) {
-            const tv = tvs.find(t => t.id === tvId);
-            if (!tv) return;
-        
-            tv.media = {
-                type: 'text',
-                content: messageData.text,
-                color: messageData.color,
-                bgColor: messageData.bgColor,
-                fontSize: messageData.fontSize,
-                timestamp: new Date()
-            };
-        
-            saveLocalData();
-        
-            if (isOnline()) {
-                try {
-                    await db.collection('tvs').doc(tvId).update({
-                        media: tv.media
-                    });
-                    showToast('Mensagem enviada com sucesso!', 'success');
-                    return true;
-                } catch (error) {
-                    console.error("Erro ao enviar mensagem:", error);
-                    showToast('Erro ao enviar. Mensagem salva localmente.', 'error');
-                    return false;
-                }
-            } else {
-                showToast('Mensagem salva localmente (offline)', 'info');
-                return false;
-            }
-        }
-        
-        // Event Listeners para texto
-        document.addEventListener('click', e => {
-            const textBtn = e.target.closest('.send-text-btn');
-            if (textBtn) {
-                const tvId = textBtn.dataset.id;
-                document.getElementById('text-message-modal').style.display = 'block';
-                document.getElementById('send-text-btn').dataset.tvId = tvId;
-                document.getElementById('text-message-content').value = '';
-            }
-        });
-        
-        document.getElementById('send-text-btn').addEventListener('click', async function() {
-            const tvId = this.dataset.tvId;
-            const message = document.getElementById('text-message-content').value.trim();
-            
-            if (!message) {
-                showToast('Digite uma mensagem!', 'error');
-                return;
-            }
-        
-            const messageData = {
-                text: message,
-                color: document.getElementById('text-color').value,
-                bgColor: document.getElementById('bg-color').value,
-                fontSize: document.getElementById('text-size').value
-            };
-        
-            await sendTextMessage(tvId, messageData);
-            document.getElementById('text-message-modal').style.display = 'none';
-        });
-        
-        // Modifique a função de visualização para texto
-        function displayMediaContent(tv) {
-            const container = document.getElementById('media-container');
-            container.innerHTML = '';
-        
-            if (!tv.media) return;
-        
-            if (tv.media.type === 'text') {
-                container.innerHTML = `
-                    <div class="text-display" style="
-                        color: ${tv.media.color || '#ffffff'};
-                        background: ${tv.media.bgColor || '#1a1f3b'};
-                        font-size: ${tv.media.fontSize || 24}px;
-                        padding: 20px;
-                        border-radius: 10px;
-                        width: 80%;
-                        margin: 0 auto;
-                        text-align: center;
-                    ">
-                        ${tv.media.content}
-                    </div>
-                    <div class="text-info" style="
-                        font-size: 12px;
-                        color: #ccc;
-                        text-align: right;
-                        margin-top: 10px;
-                    ">
-                        Enviado em: ${new Date(tv.media.timestamp).toLocaleString()}
-                    </div>
-                `;
-            } else if (tv.media.type === 'image') {
-                // ... (código existente para imagens)
-            } else if (tv.media.type === 'video') {
-                // ... (código existente para vídeos)
-            }
-        }async function sendContentToTV(tvId, content) {
-            const tvRef = db.collection('tvs').doc(tvId);
-            
-            try {
-                await tvRef.update({
-                    media: content,
-                    lastUpdate: new Date()
-                });
-                showToast('Conteúdo enviado com sucesso!', 'success');
-                return true;
-            } catch (error) {
-                console.error("Erro ao enviar conteúdo:", error);
-                
-                // Fallback offline
-                const tv = tvs.find(t => t.id === tvId);
-                if (tv) {
-                    tv.media = content;
-                    saveLocalData();
-                    showToast('Conteúdo salvo localmente (offline)', 'info');
-                }
-                return false;
-            }
-        }
+
         saveLocalData();
         updateCategoryList();
         updateTvGrid();
@@ -347,6 +226,79 @@ const uploadMediaToStorage = async (file, tvId) => {
     }
 };
 
+// Função para enviar mensagem de texto
+async function sendTextMessage(tvId, messageData) {
+    const tv = tvs.find(t => t.id === tvId);
+    if (!tv) return false;
+
+    const mediaData = {
+        type: 'text',
+        content: messageData.text,
+        color: messageData.color,
+        bgColor: messageData.bgColor,
+        fontSize: messageData.fontSize,
+        timestamp: new Date()
+    };
+
+    // Atualiza localmente
+    tv.media = mediaData;
+    saveLocalData();
+
+    // Sincroniza com Firebase se online
+    if (isOnline()) {
+        try {
+            await db.collection('tvs').doc(tvId).update({
+                media: mediaData,
+                lastUpdate: new Date()
+            });
+
+            // Envia notificação para dispositivo se ativado
+            if (tv.activationKey) {
+                await db.collection('notifications').add({
+                    tvId: tvId,
+                    activationKey: tv.activationKey,
+                    type: 'media',
+                    mediaData: mediaData,
+                    timestamp: new Date()
+                });
+            }
+
+            showToast('Mensagem enviada com sucesso!', 'success');
+            return true;
+        } catch (error) {
+            console.error("Erro ao enviar mensagem:", error);
+            showToast('Erro ao enviar. Mensagem salva localmente.', 'error');
+            return false;
+        }
+    } else {
+        showToast('Mensagem salva localmente (offline)', 'info');
+        return false;
+    }
+}
+
+// Função para exibir mensagem de texto
+function displayTextMessage(content, color, bgColor, fontSize) {
+    const modal = document.getElementById('view-media-modal');
+    const container = document.getElementById('media-container');
+    
+    container.innerHTML = `
+        <div class="text-message" style="
+            padding: 20px;
+            background: ${bgColor || '#2a2f5b'};
+            border-radius: 10px;
+            color: ${color || 'white'};
+            font-size: ${fontSize || 24}px;
+            max-width: 80%;
+            margin: 0 auto;
+            text-align: center;
+        ">
+            ${content}
+        </div>
+    `;
+    
+    modal.style.display = 'block';
+}
+
 // Evento quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM carregado, iniciando configuração...');
@@ -406,7 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        
+        const newId = (categories.length ? Math.max(...categories.map(c => parseInt(c.id))) + 1 : 1).toString();
         const newCategory = { id: newId, name, status: 'active' };
         console.log('Adicionando categoria:', newCategory);
 
@@ -626,29 +578,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const linkGroup = document.getElementById('link-upload-group');
             const imageOptions = document.getElementById('image-options');
             const videoOptions = document.getElementById('video-options');
+            const textOptions = document.getElementById('text-options');
 
             mediaTypeSelect.addEventListener('change', () => {
                 const type = mediaTypeSelect.value;
-                fileGroup.style.display = type === 'link' ? 'none' : 'block';
+                fileGroup.style.display = type === 'image' || type === 'video' ? 'block' : 'none';
                 linkGroup.style.display = type === 'link' ? 'block' : 'none';
                 imageOptions.style.display = type === 'image' ? 'block' : 'none';
                 videoOptions.style.display = type === 'video' ? 'block' : 'none';
-            });
-
-            // Pré-visualização de imagem
-            document.getElementById('media-file').addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file && file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        const preview = document.getElementById('media-preview');
-                        preview.src = event.target.result;
-                        preview.style.display = 'block';
-                    };
-                    reader.readAsDataURL(file);
-                } else {
-                    document.getElementById('media-preview').style.display = 'none';
-                }
+                textOptions.style.display = type === 'text' ? 'block' : 'none';
             });
         }
     });
@@ -664,18 +602,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const mediaType = document.getElementById('media-type').value;
         const tv = tvs.find(t => t.id === tvId);
         
-        let mediaUrl, mediaConfig = {};
+        let mediaData = {};
         
         try {
-            if (mediaType === 'link') {
-                // Lógica para links externos
-                mediaUrl = document.getElementById('media-link').value.trim();
-                if (!mediaUrl) {
-                    showToast('Digite uma URL válida', 'error');
+            if (mediaType === 'text') {
+                const content = document.getElementById('text-content').value.trim();
+                if (!content) {
+                    showToast('Digite o conteúdo do texto!', 'error');
                     return;
                 }
-                mediaConfig.type = mediaUrl.includes('.mp4') ? 'video' : 'image';
-            } else {
+                
+                mediaData = {
+                    type: 'text',
+                    content: content,
+                    color: document.getElementById('text-color').value,
+                    bgColor: document.getElementById('text-bg-color').value,
+                    fontSize: document.getElementById('text-size').value,
+                    timestamp: new Date()
+                };
+            } 
+            else if (mediaType === 'image' || mediaType === 'video') {
                 // Upload para Firebase Storage
                 const file = document.getElementById('media-file').files[0];
                 if (!file) {
@@ -690,24 +636,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 showToast('Iniciando upload...', 'info');
-                mediaUrl = await uploadMediaToStorage(file, tvId);
-                mediaConfig.type = mediaType;
+                const mediaUrl = await uploadMediaToStorage(file, tvId);
+                
+                mediaData = {
+                    type: mediaType,
+                    url: mediaUrl,
+                    timestamp: new Date()
+                };
+                
+                // Configurações específicas
+                if (mediaType === 'image') {
+                    mediaData.duration = parseInt(document.getElementById('image-duration').value) || 10;
+                } else if (mediaType === 'video') {
+                    mediaData.loop = document.getElementById('video-loop').checked;
+                }
             }
-            
-            // Configurações específicas
-            if (mediaConfig.type === 'image') {
-                mediaConfig.duration = parseInt(document.getElementById('image-duration').value) || 10;
-            } else if (mediaConfig.type === 'video') {
-                mediaConfig.loop = document.getElementById('video-loop').checked;
+            else if (mediaType === 'link') {
+                // Lógica para links externos
+                const mediaUrl = document.getElementById('media-link').value.trim();
+                if (!mediaUrl) {
+                    showToast('Digite uma URL válida', 'error');
+                    return;
+                }
+                
+                mediaData = {
+                    type: mediaUrl.includes('.mp4') ? 'video' : 'image',
+                    url: mediaUrl,
+                    timestamp: new Date()
+                };
             }
-            
+
             // Atualiza dados da TV
-            tv.media = { url: mediaUrl, ...mediaConfig };
+            tv.media = mediaData;
             saveLocalData();
             
             // Sincroniza com Firestore
             if (isOnline()) {
-                await db.collection('tvs').doc(tvId).update({ media: tv.media });
+                await db.collection('tvs').doc(tvId).update({ 
+                    media: mediaData,
+                    lastUpdate: new Date()
+                });
                 
                 // Envia notificação para dispositivo
                 if (tv.activationKey) {
@@ -715,8 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         tvId: tvId,
                         activationKey: tv.activationKey,
                         type: 'media',
-                        mediaUrl: mediaUrl,
-                        mediaConfig: mediaConfig,
+                        mediaData: mediaData,
                         timestamp: new Date()
                     });
                 }
@@ -732,69 +699,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Controle de imagem existente
-    document.addEventListener('click', e => {
-        if (e.target.closest('.upload-tv-btn')) {
-            const tvId = e.target.closest('.upload-tv-btn').dataset.id;
-            currentMediaTv = tvs.find(t => t.id === tvId);
-            
-            if (currentMediaTv.media?.url) {
-                document.getElementById('current-image-preview').src = currentMediaTv.media.url;
-                document.getElementById('image-duration-control').value = currentMediaTv.media.duration || 10;
-                document.getElementById('image-control-modal').style.display = 'block';
-            }
-        }
-    });
-
-    // Atualizar duração da imagem
-    document.getElementById('update-image-btn').addEventListener('click', async () => {
-        if (!currentMediaTv) return;
-        
-        const duration = parseInt(document.getElementById('image-duration-control').value) || 10;
-        
-        // Atualiza localmente
-        currentMediaTv.media.duration = duration;
-        saveLocalData();
-        
-        // Sincroniza com Firebase se online
-        if (isOnline()) {
-            try {
-                await db.collection('tvs').doc(currentMediaTv.id).update({
-                    'media.duration': duration
-                });
-                showToast('Duração atualizada!', 'success');
-            } catch (error) {
-                console.error("Erro ao atualizar duração:", error);
-                showToast('Atualizado localmente', 'info');
-            }
-        }
-        
-        document.getElementById('image-control-modal').style.display = 'none';
-    });
-
-    // Alterar imagem existente
-    document.getElementById('change-image-btn').addEventListener('click', () => {
-        document.getElementById('image-control-modal').style.display = 'none';
-        document.getElementById('upload-media-modal').style.display = 'block';
-        document.getElementById('upload-media-btn').dataset.tvId = currentMediaTv.id;
-    });
-
-    // Fechar modal de controle de imagem
-    document.querySelector('#image-control-modal .close-btn').addEventListener('click', () => {
-        document.getElementById('image-control-modal').style.display = 'none';
-    });
-
     // Ver mídia
     document.addEventListener('click', e => {
         const viewBtn = e.target.closest('.view-tv-btn');
         if (viewBtn) {
             const tvId = viewBtn.dataset.id;
             const tv = tvs.find(t => t.id === tvId);
-            if (!tv.media || !tv.media.url) {
+            if (!tv.media) {
                 showToast('Nenhuma mídia enviada para esta TV', 'info');
                 return;
             }
-            if (!isOnline() && !tv.media.url.startsWith('data:')) {
+            if (!isOnline() && !tv.media.url && !tv.media.content) {
                 showToast('Conecte-se para visualizar a mídia', 'error');
                 return;
             }
@@ -803,11 +718,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = document.getElementById('media-container');
             container.innerHTML = '';
 
-            if (tv.media.type === 'image') {
+            if (tv.media.type === 'text') {
+                displayTextMessage(
+                    tv.media.content,
+                    tv.media.color,
+                    tv.media.bgColor,
+                    tv.media.fontSize
+                );
+            } else if (tv.media.type === 'image') {
                 const img = document.createElement('img');
                 img.src = tv.media.url;
                 img.style.maxWidth = '100%';
                 container.appendChild(img);
+                
+                const info = document.createElement('div');
+                info.className = 'media-info';
+                info.innerHTML = `
+                    <p>Duração: ${tv.media.duration || 10} segundos</p>
+                    <p>Enviado em: ${new Date(tv.media.timestamp).toLocaleString()}</p>
+                `;
+                container.appendChild(info);
             } else if (tv.media.type === 'video') {
                 const video = document.createElement('video');
                 video.src = tv.media.url;
@@ -816,6 +746,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 video.style.maxWidth = '100%';
                 video.autoplay = true;
                 container.appendChild(video);
+                
+                const info = document.createElement('div');
+                info.className = 'media-info';
+                info.innerHTML = `
+                    <p>Loop: ${tv.media.loop ? 'Sim' : 'Não'}</p>
+                    <p>Enviado em: ${new Date(tv.media.timestamp).toLocaleString()}</p>
+                `;
+                container.appendChild(info);
             }
 
             modal.style.display = 'block';
@@ -930,54 +868,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Adicione esta função ao seu painel.js para lidar com mensagens de texto
-function displayTextMessage(content) {
-    const modal = document.getElementById('view-media-modal');
-    const container = document.getElementById('media-container');
+    // Envio rápido de mensagem de texto
+    document.addEventListener('click', e => {
+        const textBtn = e.target.closest('.send-text-btn');
+        if (textBtn) {
+            const tvId = textBtn.dataset.id;
+            document.getElementById('text-message-modal').style.display = 'block';
+            document.getElementById('send-text-btn').dataset.tvId = tvId;
+            document.getElementById('text-message-content').value = '';
+        }
+    });
     
-    container.innerHTML = `
-        <div class="text-message" style="
-            padding: 20px;
-            background: #2a2f5b;
-            border-radius: 10px;
-            color: white;
-            font-size: 24px;
-            max-width: 80%;
-            margin: 0 auto;
-            text-align: center;
-        ">
-            ${content}
-        </div>
-    `;
-    
-    modal.style.display = 'block';
-}
-
-// Modifique a função de visualização de mídia no painel.js
-document.addEventListener('click', e => {
-    const viewBtn = e.target.closest('.view-tv-btn');
-    if (viewBtn) {
-        const tvId = viewBtn.dataset.id;
-        const tv = tvs.find(t => t.id === tvId);
+    document.getElementById('send-text-btn').addEventListener('click', async function() {
+        const tvId = this.dataset.tvId;
+        const message = document.getElementById('text-message-content').value.trim();
         
-        if (!tv.media) {
-            showToast('Nenhuma mídia enviada para esta TV', 'info');
+        if (!message) {
+            showToast('Digite uma mensagem!', 'error');
             return;
         }
-
-        const modal = document.getElementById('view-media-modal');
-        const container = document.getElementById('media-container');
-        container.innerHTML = '';
-
-        if (tv.media.type === 'text') {
-            displayTextMessage(tv.media.content);
-        } else if (tv.media.type === 'image') {
-            // Código existente para imagens...
-        } else if (tv.media.type === 'video') {
-            // Código existente para vídeos...
-        }
-
-        modal.style.display = 'block';
-    }
-});
+    
+        const messageData = {
+            text: message,
+            color: document.getElementById('text-color').value,
+            bgColor: document.getElementById('bg-color').value,
+            fontSize: document.getElementById('text-size').value
+        };
+    
+        await sendTextMessage(tvId, messageData);
+        document.getElementById('text-message-modal').style.display = 'none';
+    });
+    
+    document.querySelector('#text-message-modal .close-btn').addEventListener('click', () => {
+        document.getElementById('text-message-modal').style.display = 'none';
+    });
 });
