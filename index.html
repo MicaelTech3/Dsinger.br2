@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dsigner - Login</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1a1f3b;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #0a0f2b;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #00d4ff;
+            width: 300px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        h1 {
+            color: #00d4ff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #00d4ff;
+            border-radius: 5px;
+            background-color: #1a1f3b;
+            color: white;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #00d4ff;
+            color: #0a0f2b;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background-color: #00b3d1;
+        }
+        #login-message {
+            margin-top: 15px;
+            text-align: center;
+            color: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Dsigner</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Senha:</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Entrar</button>
+            <div id="login-message"></div>
+        </form>
+    </div>
+
+    <!-- Firebase SDK -->
+    
+        <!-- Adicione estas tags ANTES do seu script -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+
+<script>
+// Configuração ÚNICA do Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyAo12uC5EM7t4_nocYhfOdTY15men1Ping",
+    authDomain: "dsigner-com-br.firebaseapp.com",
+    databaseURL: "https://dsigner-com-br-default-rtdb.firebaseio.com",
+    projectId: "dsigner-com-br",
+    storageBucket: "dsigner-com-br.firebasestorage.app",
+    messagingSenderId: "905799758619",
+    appId: "1:905799758619:web:713beeced2de2cdd7f19be"
+};
+
+// Inicialização do Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('login-form');
+    
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Feedback visual
+            const btn = this.querySelector('button[type="submit"]');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "Autenticando...";
+            
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Login bem-sucedido
+                    console.log("Usuário logado:", userCredential.user);
+                    window.location.href = 'painel.html';
+                })
+                .catch(error => {
+                    console.error("Erro de login:", error);
+                    document.getElementById('login-message').textContent = getErrorMessage(error);
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                });
+        });
+    }
+});
+
+function getErrorMessage(error) {
+    switch (error.code) {
+        case 'auth/invalid-email': return 'Email inválido';
+        case 'auth/user-disabled': return 'Conta desativada';
+        case 'auth/user-not-found': return 'Usuário não encontrado';
+        case 'auth/wrong-password': return 'Senha incorreta';
+        case 'auth/too-many-requests': return 'Muitas tentativas. Tente mais tarde.';
+        default: return 'Erro ao fazer login: ' + error.message;
+    }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+/* Estilos Gerais */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Arial', sans-serif;
+}
+
+body {
+    background-color: #1a1f3b;
+    color: #ffffff;
+    min-height: 100vh;
+}
+
+/* Página de Login */
+.login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
+}
+
+.logo h1 {
+    color: #00d4ff;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px #00d4ff;
+}
+
+.logo p {
+    color: #ffffff;
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+}
+
+.login-box {
+    background-color: #2a2f5b;
+    padding: 30px;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+}
+
+.login-box h2 {
+    color: #00d4ff;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #ffffff;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #00d4ff;
+    border-radius: 5px;
+    background-color: #0a0f2b;
+    color: #ffffff;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    background-color: #00d4ff;
+    color: #0a0f2b;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+button:hover {
+    background-color: #00b3d1;
+}
+
+.message {
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Painel Administrativo */
+.painel-header {
+    background-color: #0a0f2b;
+    padding: 20px;
+    border-bottom: 2px solid #00d4ff;
+}
+
+.header-content {
+    margin-bottom: 20px;
+}
+
+.header-content h1 {
+    color: #00d4ff;
+    font-size: 2rem;
+}
+
+.header-content p {
+    color: #ffffff;
+}
+
+.painel-menu ul {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.painel-menu a {
+    color: #ffffff;
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.painel-menu a:hover, .painel-menu a.active {
+    background-color: rgba(0, 212, 255, 0.1);
+    color: #00d4ff;
+}
+
+.painel-menu a.active {
+    box-shadow: 0 0 10px #00d4ff;
+}
+
+.painel-content {
+    padding: 30px 20px;
+}
+
+.content-section {
+    display: none;
+}
+
+.content-section.active {
+    display: block;
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.section-content, .sobre-content, .support-content {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.sobre-container {
+    background-color: #2a2f5b;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+}
+
+.gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.gallery img {
+    width: 200px;
+    height: auto;
+    border-radius: 5px;
+    border: 2px solid #00d4ff;
+    transition: transform 0.3s;
+}
+
+.gallery img:hover {
+    transform: scale(1.05);
+}
+
+.support-content form {
+    background-color: #2a2f5b;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+.support-content textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 10px;
+    background-color: #0a0f2b;
+    border: 1px solid #00d4ff;
+    color: #ffffff;
+    border-radius: 5px;
+}
+
+.logout-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.logout-btn:hover {
+    background-color: #cc0000;
+}

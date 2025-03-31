@@ -1,0 +1,20 @@
+{
+    "name": "Dsigner Painel",
+    "short_name": "Dsigner",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1a1f3b",
+    "theme_color": "#00d4ff",
+    "icons": [
+        {
+            "src": "icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

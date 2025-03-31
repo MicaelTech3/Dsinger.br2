@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dskey - Gerador e Visualizador</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1f3b;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        #generator-mode, #viewer-mode {
+            display: none;
+        }
+        .container {
+            background-color: #2a2f5b;
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+        .key-display {
+            background-color: #0a0f2b;
+            border: 1px dashed #00d4ff;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 1.2rem;
+            word-break: break-all;
+        }
+        button {
+            background-color: #00d4ff;
+            color: #0a0f2b;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+        }
+        #fullscreen-img {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            z-index: 100;
+        }
+        #viewer-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <!-- Modo Gerador -->
+    <div id="generator-mode" class="container">
+        <h2>Gerador Dskey</h2>
+        <p>Seu código único para ativação:</p>
+        <div id="activation-code" class="key-display">Gerando código...</div>
+        <button id="copy-btn">Copiar Código</button>
+        <button id="new-code-btn">Gerar Novo Código</button>
+    </div>
+
+    <!-- Modo Visualizador -->
+    <div id="viewer-mode" class="container">
+        <h2>Visualizador Dskey</h2>
+        <p>Código ativo:</p>
+        <div id="viewer-code" class="key-display"></div>
+        <p id="connection-status">Conectando...</p>
+    </div>
+
+    <!-- Visualização de Imagem -->
+    <img id="fullscreen-img" src="" alt="Imagem transmitida">
+    <div id="viewer-info">
+        <div>Tempo de exibição: <span id="display-time">0</span>s</div>
+    </div>
+
+    <!-- Firebase e App -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script>
+        // Configuração do Firebase (use suas credenciais)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDlgIizNtz3lCspNnwOfZrZEN2RU7AFopA",
+            authDomain: "dsingebr-v2.firebaseapp.com",
+            projectId: "dsingebr-v2",
+            storageBucket: "dsingebr-v2.appspot.com",
+            messagingSenderId: "621793308986",
+            appId: "1:621793308986:web:52b5a8de51261aca1da003"
+        };
+
+        // Inicializa Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Elementos
+        const generatorMode = document.getElementById('generator-mode');
+        const viewerMode = document.getElementById('viewer-mode');
+        const activationCode = document.getElementById('activation-code');
+        const viewerCode = document.getElementById('viewer-code');
+        const fullscreenImg = document.getElementById('fullscreen-img');
+        const displayTime = document.getElementById('display-time');
+        const connectionStatus = document.getElementById('connection-status');
+
+        // Variáveis
+        let currentKey = null;
+        let isViewerMode = false;
+        let unsubscribe = null;
+        let displaySeconds = 0;
+        let timerInterval = null;
+
+        // Gera um código único
+        function generateCode() {
+            const timestamp = Date.now();
+            const random = Math.floor(Math.random() * 10000);
+            return `DSK-${timestamp}-${random}`;
+        }
+
+        // Verifica o modo de operação
+        function checkMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const key = urlParams.get('key');
+            
+            if (key) {
+                // Modo Visualizador
+                isViewerMode = true;
+                currentKey = key;
+                setupViewerMode();
+            } else {
+                // Modo Gerador
+                isViewerMode = false;
+                setupGeneratorMode();
+            }
+        }
+
+        // Configura o modo gerador
+        function setupGeneratorMode() {
+            generatorMode.style.display = 'block';
+            viewerMode.style.display = 'none';
+            
+            // Gera código inicial
+            currentKey = generateCode();
+            activationCode.textContent = currentKey;
+            localStorage.setItem('dskey_code', currentKey);
+            
+            // Configura botões
+            document.getElementById('copy-btn').addEventListener('click', () => {
+                navigator.clipboard.writeText(currentKey);
+                alert('Código copiado!');
+            });
+            
+            document.getElementById('new-code-btn').addEventListener('click', () => {
+                currentKey = generateCode();
+                activationCode.textContent = currentKey;
+                localStorage.setItem('dskey_code', currentKey);
+            });
+        }
+
+        // Configura o modo visualizador
+        function setupViewerMode() {
+            generatorMode.style.display = 'none';
+            viewerMode.style.display = 'block';
+            viewerCode.textContent = currentKey;
+            
+            // Monitora alterações na TV correspondente
+            unsubscribe = db.collection('tvs')
+                .where('activationKey', '==', currentKey)
+                .onSnapshot(snapshot => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'added' || change.type === 'modified') {
+                            const tvData = change.doc.data();
+                            if (tvData.media) {
+                                updateImage(tvData.media.url, tvData.media.duration);
+                            }
+                        }
+                    });
+                    connectionStatus.textContent = "Conectado e sincronizado";
+                });
+        }
+
+        // Atualiza a imagem exibida
+        function updateImage(imageUrl, duration = 10) {
+            if (!imageUrl) return;
+            
+            // Reseta o timer
+            displaySeconds = 0;
+            if (timerInterval) clearInterval(timerInterval);
+            
+            // Carrega a nova imagem
+            fullscreenImg.style.display = 'none';
+            fullscreenImg.onload = function() {
+                this.style.display = 'block';
+                timerInterval = setInterval(() => {
+                    displaySeconds++;
+                    document.getElementById('display-time').textContent = displaySeconds;
+                }, 1000);
+            };
+            fullscreenImg.src = imageUrl;
+        }
+
+        // Inicialização
+        window.addEventListener('load', checkMode);
+    </script>
+</body>
+</html>
