@@ -28,15 +28,45 @@
             max-width: 500px;
         }
 
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
+            margin-bottom: 10px;
+        }
+
         .key-display {
             background-color: #0a0f2b;
             border: 1px dashed #00d4ff;
             border-radius: 5px;
-            padding: 15px;
+            padding: 20px;
             margin: 20px 0;
             font-family: monospace;
-            font-size: 1.2rem;
+            font-size: 2rem; /* Aumentado o tamanho do código */
             word-break: break-all;
+            letter-spacing: 3px;
+        }
+
+        .description {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .description a {
+            color: #00d4ff;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 2px 8px;
+            background-color: rgba(0, 212, 255, 0.1);
+            border-radius: 3px;
+            transition: all 0.3s;
+        }
+
+        .description a:hover {
+            background-color: rgba(0, 212, 255, 0.3);
         }
 
         .btn {
@@ -53,6 +83,10 @@
 
         .btn-view {
             background-color: #4CAF50;
+        }
+
+        .btn-generate {
+            background-color: #FF9800;
         }
 
         /* Modo Player */
@@ -111,7 +145,6 @@
             color: #FF9800;
         }
 
-        /* Tela cheia - modo limpo */
         .fullscreen-mode {
             cursor: none;
         }
@@ -121,7 +154,6 @@
             display: none !important;
         }
 
-        /* Botão de saída (aparece ao mover mouse) */
         .exit-button {
             position: fixed;
             top: 20px;
@@ -140,20 +172,18 @@
 <body>
     <!-- Modo Gerador -->
     <div id="generator-mode">
-        <h2>Dskey</h2>
-        <p>Sua chave única de ativação:</p>
+        <h2 class="logo">Dsigner</h2>
+        <p class="description">Vá ao painel em <a href="https://dsignertv.com.br/" target="_blank">https://dsignertv.com.br/</a></p>
         <div id="activation-key" class="key-display">Gerando chave...</div>
-        
         <button id="view-btn" class="btn btn-view">Visualizar Conteúdo</button>
+        <button id="generate-new-key" class="btn btn-generate">Gerar Nova Chave</button>
         <div class="connection-status" id="gen-status"></div>
     </div>
 
     <!-- Modo Player -->
     <div id="player-mode">
         <button class="exit-button" id="exit-btn">Sair (ESC)</button>
-        <div id="media-display">
-            <!-- Conteúdo será injetado aqui -->
-        </div>
+        <div id="media-display"></div>
         <div class="media-info" id="media-info"></div>
         <div class="connection-status" id="player-status"></div>
     </div>
@@ -180,10 +210,11 @@
         const playerMode = document.getElementById('player-mode');
         const activationKeyEl = document.getElementById('activation-key');
         const viewBtn = document.getElementById('view-btn');
+        const generateNewKeyBtn = document.getElementById('generate-new-key');
         const exitBtn = document.getElementById('exit-btn');
         const mediaInfo = document.getElementById('media-info');
         const playerStatus = document.getElementById('player-status');
-        let currentKey = generateKey();
+        let currentKey = loadKey();
         let unsubscribe;
         let showInfo = false;
 
@@ -193,7 +224,6 @@
 
         // Botão Visualizar
         viewBtn.addEventListener('click', () => {
-            // Alternar entre modos
             if (playerMode.style.display === 'none') {
                 generatorMode.style.display = 'none';
                 playerMode.style.display = 'block';
@@ -209,78 +239,24 @@
             }
         });
 
-        // Função para entrar em tela cheia
-        function enterFullscreen() {
-            const element = document.documentElement;
-            if (element.requestFullscreen) {
-                element.requestFullscreen();
-            } else if (element.mozRequestFullScreen) {
-                element.mozRequestFullScreen();
-            } else if (element.webkitRequestFullscreen) {
-                element.webkitRequestFullscreen();
-            } else if (element.msRequestFullscreen) {
-                element.msRequestFullscreen();
-            }
-            
-            document.body.classList.add('fullscreen-mode');
-            showInfo = false;
-            updateInfoVisibility();
-        }
-
-        // Função para sair da tela cheia
-        function exitFullscreen() {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
-            
-            document.body.classList.remove('fullscreen-mode');
-            showInfo = true;
-            updateInfoVisibility();
-        }
-
-        // Atualiza a visibilidade das informações
-        function updateInfoVisibility() {
-            if (showInfo) {
-                mediaInfo.style.display = 'block';
-                playerStatus.style.display = 'block';
-            } else {
-                mediaInfo.style.display = 'none';
-                playerStatus.style.display = 'none';
-            }
-        }
-
-        // Mostrar/ocultar informações com a tecla 'i'
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'i' || e.key === 'I') {
-                showInfo = !showInfo;
-                updateInfoVisibility();
-            } else if (e.key === 'Escape') {
-                exitFullscreen();
-            }
+        // Botão Gerar Nova Chave
+        generateNewKeyBtn.addEventListener('click', () => {
+            currentKey = generateKey();
+            localStorage.setItem('deviceKey', currentKey);
+            activationKeyEl.textContent = currentKey;
         });
 
-        // Mostrar botão de saída quando o mouse se mover
-        playerMode.addEventListener('mousemove', () => {
-            if (document.body.classList.contains('fullscreen-mode')) {
-                exitBtn.style.display = 'block';
-                setTimeout(() => {
-                    exitBtn.style.display = 'none';
-                }, 2000);
+        // Função para carregar ou gerar chave persistente
+        function loadKey() {
+            let key = localStorage.getItem('deviceKey');
+            if (!key) {
+                key = generateKey();
+                localStorage.setItem('deviceKey', key);
             }
-        });
+            return key;
+        }
 
-        // Botão de saída
-        exitBtn.addEventListener('click', () => {
-            exitFullscreen();
-        });
-
-        // Funções auxiliares
+        // Função para gerar chave
         function generateKey() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let key = '';
@@ -290,10 +266,63 @@
             return key;
         }
 
+        // Função para entrar em tela cheia
+        function enterFullscreen() {
+            const element = document.documentElement;
+            if (element.requestFullscreen) element.requestFullscreen();
+            else if (element.mozRequestFullScreen) element.mozRequestFullScreen();
+            else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
+            else if (element.msRequestFullscreen) element.msRequestFullscreen();
+            
+            document.body.classList.add('fullscreen-mode');
+            showInfo = false;
+            updateInfoVisibility();
+        }
+
+        // Função para sair da tela cheia
+        function exitFullscreen() {
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            else if (document.msExitFullscreen) document.msExitFullscreen();
+            
+            document.body.classList.remove('fullscreen-mode');
+            showInfo = true;
+            updateInfoVisibility();
+        }
+
+        // Atualiza visibilidade das informações
+        function updateInfoVisibility() {
+            mediaInfo.style.display = showInfo ? 'block' : 'none';
+            playerStatus.style.display = showInfo ? 'block' : 'none';
+        }
+
+        // Teclas de atalho
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'i' || e.key === 'I') {
+                showInfo = !showInfo;
+                updateInfoVisibility();
+            } else if (e.key === 'Escape') {
+                exitFullscreen();
+            }
+        });
+
+        // Mostrar botão de saída ao mover o mouse
+        playerMode.addEventListener('mousemove', () => {
+            if (document.body.classList.contains('fullscreen-mode')) {
+                exitBtn.style.display = 'block';
+                setTimeout(() => exitBtn.style.display = 'none', 2000);
+            }
+        });
+
+        // Botão de saída
+        exitBtn.addEventListener('click', exitFullscreen);
+
+        // Funções auxiliares
         function updateGenStatus(message, status) {
             const el = document.getElementById('gen-status');
             el.textContent = message;
-            el.className = 'connection-status ' + status;
+            el.className = `connection-status ${status}`;
         }
 
         // ========== MODO PLAYER ==========
@@ -302,17 +331,13 @@
             showInfo = false;
             updateInfoVisibility();
             
-            // Monitorar status da conexão
             window.addEventListener('online', () => {
                 updatePlayerStatus('✔ Online', 'online');
                 if (!unsubscribe) startListening(key);
             });
 
-            window.addEventListener('offline', () => {
-                updatePlayerStatus('⚡ Offline', 'offline');
-            });
+            window.addEventListener('offline', () => updatePlayerStatus('⚡ Offline', 'offline'));
 
-            // Iniciar listener
             startListening(key);
         }
 
@@ -340,15 +365,11 @@
         function handleError(error) {
             console.error("Erro na conexão:", error);
             updatePlayerStatus('Erro de conexão', 'offline');
-            
-            if (error.code === 'unavailable') {
-                setTimeout(() => startListening(currentKey), 5000);
-            }
+            if (error.code === 'unavailable') setTimeout(() => startListening(currentKey), 5000);
         }
 
         function updateDisplay(tvData) {
             const display = document.getElementById('media-display');
-            
             display.innerHTML = '';
             mediaInfo.textContent = `TV ${tvData.name || 'Sem nome'} • ${new Date().toLocaleTimeString()}`;
 
@@ -362,19 +383,17 @@
                 textEl.className = 'text-content';
                 textEl.style.color = tvData.media.color || '#ffffff';
                 textEl.style.backgroundColor = tvData.media.bgColor || 'transparent';
-                textEl.style.fontSize = (tvData.media.fontSize || 24) + 'px';
+                textEl.style.fontSize = `${tvData.media.fontSize || 24}px`;
                 textEl.textContent = tvData.media.content;
                 display.appendChild(textEl);
-            } 
-            else if (tvData.media.type === 'image') {
+            } else if (tvData.media.type === 'image') {
                 const imgEl = document.createElement('img');
                 imgEl.src = tvData.media.url;
                 imgEl.style.maxWidth = '100%';
                 imgEl.style.maxHeight = '100%';
                 imgEl.style.objectFit = 'contain';
                 display.appendChild(imgEl);
-            }
-            else if (tvData.media.type === 'video') {
+            } else if (tvData.media.type === 'video') {
                 const videoEl = document.createElement('video');
                 videoEl.src = tvData.media.url;
                 videoEl.controls = false;
@@ -388,14 +407,13 @@
         }
 
         function showError(message) {
-            const display = document.getElementById('media-display');
-            display.innerHTML = `<p style="color: #ff5555">${message}</p>`;
+            document.getElementById('media-display').innerHTML = `<p style="color: #ff5555">${message}</p>`;
         }
 
         function updatePlayerStatus(message, status) {
             const el = document.getElementById('player-status');
             el.textContent = message;
-            el.className = 'connection-status ' + status;
+            el.className = `connection-status ${status}`;
         }
     </script>
 </body>
