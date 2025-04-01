@@ -60,6 +60,7 @@
             display: none;
             width: 100%;
             height: 100%;
+            position: relative;
         }
 
         #media-display {
@@ -85,12 +86,12 @@
             right: 10px;
             font-size: 12px;
             color: #ccc;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0,0,0,0.7);
             padding: 5px 10px;
             border-radius: 5px;
+            display: none;
         }
 
-        /* Status */
         .connection-status {
             position: fixed;
             bottom: 10px;
@@ -98,31 +99,58 @@
             font-size: 12px;
             padding: 5px 10px;
             border-radius: 5px;
+            display: none;
+            background: rgba(0,0,0,0.7);
         }
 
         .online {
-            background: #4CAF50;
+            color: #4CAF50;
         }
 
         .offline {
-            background: #FF9800;
-            color: #000;
+            color: #FF9800;
+        }
+
+        /* Tela cheia - modo limpo */
+        .fullscreen-mode {
+            cursor: none;
+        }
+
+        .fullscreen-mode .media-info,
+        .fullscreen-mode .connection-status {
+            display: none !important;
+        }
+
+        /* Botão de saída (aparece ao mover mouse) */
+        .exit-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
     <!-- Modo Gerador -->
     <div id="generator-mode">
-        <h2>Dskey - Controle de TV</h2>
+        <h2>Dskey</h2>
         <p>Sua chave única de ativação:</p>
         <div id="activation-key" class="key-display">Gerando chave...</div>
-        <button id="copy-btn" class="btn">Copiar Chave</button>
+        
         <button id="view-btn" class="btn btn-view">Visualizar Conteúdo</button>
         <div class="connection-status" id="gen-status"></div>
     </div>
 
     <!-- Modo Player -->
     <div id="player-mode">
+        <button class="exit-button" id="exit-btn">Sair (ESC)</button>
         <div id="media-display">
             <!-- Conteúdo será injetado aqui -->
         </div>
@@ -152,17 +180,16 @@
         const playerMode = document.getElementById('player-mode');
         const activationKeyEl = document.getElementById('activation-key');
         const viewBtn = document.getElementById('view-btn');
+        const exitBtn = document.getElementById('exit-btn');
+        const mediaInfo = document.getElementById('media-info');
+        const playerStatus = document.getElementById('player-status');
         let currentKey = generateKey();
+        let unsubscribe;
+        let showInfo = false;
 
         // Inicialização
         activationKeyEl.textContent = currentKey;
         updateGenStatus('Pronto para uso', 'online');
-
-        // Botão Copiar
-        document.getElementById('copy-btn').addEventListener('click', () => {
-            navigator.clipboard.writeText(currentKey);
-            alert('Chave copiada! Cole no painel ao criar a TV.');
-        });
 
         // Botão Visualizar
         viewBtn.addEventListener('click', () => {
@@ -171,13 +198,86 @@
                 generatorMode.style.display = 'none';
                 playerMode.style.display = 'block';
                 initPlayerMode(currentKey);
+                enterFullscreen();
                 viewBtn.textContent = 'Voltar ao Gerador';
             } else {
+                exitFullscreen();
                 playerMode.style.display = 'none';
                 generatorMode.style.display = 'flex';
                 viewBtn.textContent = 'Visualizar Conteúdo';
                 if (unsubscribe) unsubscribe();
             }
+        });
+
+        // Função para entrar em tela cheia
+        function enterFullscreen() {
+            const element = document.documentElement;
+            if (element.requestFullscreen) {
+                element.requestFullscreen();
+            } else if (element.mozRequestFullScreen) {
+                element.mozRequestFullScreen();
+            } else if (element.webkitRequestFullscreen) {
+                element.webkitRequestFullscreen();
+            } else if (element.msRequestFullscreen) {
+                element.msRequestFullscreen();
+            }
+            
+            document.body.classList.add('fullscreen-mode');
+            showInfo = false;
+            updateInfoVisibility();
+        }
+
+        // Função para sair da tela cheia
+        function exitFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            
+            document.body.classList.remove('fullscreen-mode');
+            showInfo = true;
+            updateInfoVisibility();
+        }
+
+        // Atualiza a visibilidade das informações
+        function updateInfoVisibility() {
+            if (showInfo) {
+                mediaInfo.style.display = 'block';
+                playerStatus.style.display = 'block';
+            } else {
+                mediaInfo.style.display = 'none';
+                playerStatus.style.display = 'none';
+            }
+        }
+
+        // Mostrar/ocultar informações com a tecla 'i'
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'i' || e.key === 'I') {
+                showInfo = !showInfo;
+                updateInfoVisibility();
+            } else if (e.key === 'Escape') {
+                exitFullscreen();
+            }
+        });
+
+        // Mostrar botão de saída quando o mouse se mover
+        playerMode.addEventListener('mousemove', () => {
+            if (document.body.classList.contains('fullscreen-mode')) {
+                exitBtn.style.display = 'block';
+                setTimeout(() => {
+                    exitBtn.style.display = 'none';
+                }, 2000);
+            }
+        });
+
+        // Botão de saída
+        exitBtn.addEventListener('click', () => {
+            exitFullscreen();
         });
 
         // Funções auxiliares
@@ -197,10 +297,10 @@
         }
 
         // ========== MODO PLAYER ==========
-        let unsubscribe;
-
         function initPlayerMode(key) {
             updatePlayerStatus('Conectando...', 'offline');
+            showInfo = false;
+            updateInfoVisibility();
             
             // Monitorar status da conexão
             window.addEventListener('online', () => {
@@ -248,10 +348,9 @@
 
         function updateDisplay(tvData) {
             const display = document.getElementById('media-display');
-            const info = document.getElementById('media-info');
             
             display.innerHTML = '';
-            info.textContent = `TV ${tvData.name || 'Sem nome'} • ${new Date().toLocaleTimeString()}`;
+            mediaInfo.textContent = `TV ${tvData.name || 'Sem nome'} • ${new Date().toLocaleTimeString()}`;
 
             if (!tvData.media) {
                 display.innerHTML = '<p>Aguardando conteúdo...</p>';
@@ -271,7 +370,8 @@
                 const imgEl = document.createElement('img');
                 imgEl.src = tvData.media.url;
                 imgEl.style.maxWidth = '100%';
-                imgEl.style.maxHeight = '90vh';
+                imgEl.style.maxHeight = '100%';
+                imgEl.style.objectFit = 'contain';
                 display.appendChild(imgEl);
             }
             else if (tvData.media.type === 'video') {
@@ -281,7 +381,8 @@
                 videoEl.autoplay = true;
                 videoEl.loop = tvData.media.loop || false;
                 videoEl.style.maxWidth = '100%';
-                videoEl.style.maxHeight = '90vh';
+                videoEl.style.maxHeight = '100%';
+                videoEl.style.objectFit = 'contain';
                 display.appendChild(videoEl);
             }
         }
